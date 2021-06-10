@@ -1,3 +1,5 @@
+const db = require('../../data/db-config');
+
 function find() { // EXERCISE A
   /*
     1A- Study the SQL query below running it in SQLite Studio against `data/schemes.db3`.
@@ -15,6 +17,15 @@ function find() { // EXERCISE A
     2A- When you have a grasp on the query go ahead and build it in Knex.
     Return from this function the resulting dataset.
   */
+  return db('steps')
+    .select([
+      'sc.*',
+    ])
+    .count('st.step_id as number_of_steps')
+    .from('schemes as sc')
+    .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+    .groupBy('sc.scheme_id')
+    .orderBy('sc.scheme_id', 'asc');
 }
 
 function findById(scheme_id) { // EXERCISE B
@@ -83,6 +94,23 @@ function findById(scheme_id) { // EXERCISE B
         "steps": []
       }
   */
+  return db('steps')
+    .select([
+      'sc.scheme_name',
+      'st.*'
+    ])
+    .from('schemes as sc')
+    .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+    .where('sc.scheme_id', scheme_id)
+    .orderBy('st.step_number', 'asc')
+    .then((steps) => {
+      const newSteps = steps.filter(step => step.step_id !== null);
+      return {
+        scheme_id: steps[0] && steps[0].scheme_id !== null ? steps[0].scheme_id : Number(scheme_id),
+        scheme_name: steps[0] && steps[0].scheme_name !== null ? steps[0].scheme_name : null,
+        steps: newSteps,
+      };
+    });
 }
 
 function findSteps(scheme_id) { // EXERCISE C
@@ -106,12 +134,33 @@ function findSteps(scheme_id) { // EXERCISE C
         }
       ]
   */
+  return db('steps')
+    .select([
+      'st.step_id',
+      'st.step_number',
+      'st.instructions',
+      'sc.scheme_name'
+    ])
+    .from('schemes as sc')
+    .leftJoin('steps as st', 'sc.scheme_id', 'st.scheme_id')
+    .where('sc.scheme_id', scheme_id)
+    .groupBy('st.step_number')
+    .orderBy('st.step_number', 'asc')
+    .then((steps) => {
+      const newSteps = steps.filter(step => step.step_id !== null);
+      return newSteps;
+    });
 }
 
 function add(scheme) { // EXERCISE D
   /*
     1D- This function creates a new scheme and resolves to _the newly created scheme_.
   */
+  return db('schemes')
+    .insert(scheme)
+    .then(ids => {
+      return findById(ids[0]);
+    });
 }
 
 function addStep(scheme_id, step) { // EXERCISE E
@@ -120,6 +169,12 @@ function addStep(scheme_id, step) { // EXERCISE E
     and resolves to _all the steps_ belonging to the given `scheme_id`,
     including the newly created one.
   */
+  const newStep = Object.assign(step, { scheme_id: Number(scheme_id) });
+  return db('steps')
+    .insert(newStep)
+    .then(() => {
+      return findSteps(scheme_id);
+    });
 }
 
 module.exports = {
@@ -128,4 +183,4 @@ module.exports = {
   findSteps,
   add,
   addStep,
-}
+};
